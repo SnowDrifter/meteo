@@ -71,12 +71,11 @@ void updatePressure() {
     return;
   }
 
-  float pressure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
+  int preassure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
 
   char result[8];
   char str_pressure[6];
-  dtostrf(pressure, 3, 1, str_pressure);
-  sprintf(result, "%smm", str_pressure);
+  sprintf(result, "%dmm", preassure);
 
   printToMonitor(result);
 }
@@ -85,8 +84,8 @@ void printToMonitor(String value) {
   char buffer[20];
   value.toCharArray(buffer, 20);
 
-  u8g2.clearBuffer();          // clear the internal memory
-  u8g2.setFont(u8g2_font_logisoso28_tr);  // choose a suitable font at https://github.com/olikraus/u8g2/wiki/fntlistall
-  u8g2.drawStr(8, 29, buffer); // write something to the internal memory
-  u8g2.sendBuffer();         // transfer internal memory to the display
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_logisoso28_tr);
+  u8g2.drawStr(8, 31, buffer);
+  u8g2.sendBuffer();
 }
