@@ -4,7 +4,8 @@
 #include <U8g2lib.h>
 #include <SPI.h>
 #include <Wire.h>
-#include "cactus_io_AM2302.h"
+#include <cactus_io_AM2302.h>
+#include <DS3231.h>
 
 #define AM2302_PIN 2
 #define BMP_SCK 13
@@ -15,11 +16,14 @@
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 AM2302 dht(AM2302_PIN);
 Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
+RTClib RTC;
 
 void setup() {
   Serial.begin(9600);
+  Serial.println("in progress..");
   u8g2.begin();
   dht.begin();
+  Serial.println("started");
 }
 
 void loop() {
@@ -29,6 +33,20 @@ void loop() {
   delay(2000);
   updatePressure();
   delay(2000);
+
+  DateTime now = RTC.now();
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(' ');
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
 }
 
 void updateHumidity() {
