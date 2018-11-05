@@ -89,11 +89,11 @@ void updatePressure() {
     return;
   }
 
-  int preassure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
+  int pressure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
 
   char result[8];
   char str_pressure[6];
-  sprintf(result, "%dmm", preassure);
+  sprintf(result, "%dmm", pressure);
 
   printToMonitor(result);
 }
