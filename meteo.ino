@@ -8,14 +8,10 @@
 #include <DS3231.h>
 
 #define AM2302_PIN 2
-#define BMP_SCK 13
-#define BMP_MISO 10
-#define BMP_MOSI 12
-#define BMP_CS 11
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 AM2302 dht(AM2302_PIN);
-Adafruit_BMP280 bme(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
+Adafruit_BMP280 bme;
 RTClib RTC;
 
 void setup() {
