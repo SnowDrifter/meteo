@@ -6,8 +6,10 @@
 #include <Wire.h>
 #include <cactus_io_AM2302.h>
 #include <DS3231.h>
+#include <SD.h>
 
 #define AM2302_PIN 2
+#define SD_PORT 53
 
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
 AM2302 dht(AM2302_PIN);
@@ -16,36 +18,30 @@ RTClib RTC;
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("in progress..");
   u8g2.begin();
   dht.begin();
-  Serial.println("started");
+
+  pinMode(SD_PORT, OUTPUT);
+  if (!SD.begin(SD_PORT)) {
+    Serial.println("Card failed, or not present");
+  } else {
+    Serial.println("Card initialized");
+  }
+
+  Serial.println("Setup finished");
 }
 
 void loop() {
-  updateHumidity();
+  float humidity = updateHumidity();
   delay(2000);
-  updateTemperature();
+  float temperature = updateTemperature();
   delay(2000);
-  updatePressure();
+  int pressure = updatePressure();
   delay(2000);
-
-  DateTime now = RTC.now();
-  Serial.print(now.year(), DEC);
-  Serial.print('/');
-  Serial.print(now.month(), DEC);
-  Serial.print('/');
-  Serial.print(now.day(), DEC);
-  Serial.print(' ');
-  Serial.print(now.hour(), DEC);
-  Serial.print(':');
-  Serial.print(now.minute(), DEC);
-  Serial.print(':');
-  Serial.print(now.second(), DEC);
-  Serial.println();
+  logToFile(humidity, temperature, pressure);
 }
 
-void updateHumidity() {
+float updateHumidity() {
   dht.readHumidity();
   if (isnan(dht.humidity)) {
     Serial.println("DHT sensor read failure!");
@@ -60,9 +56,10 @@ void updateHumidity() {
   sprintf(result, "%s%%", str_humidity);
 
   printToMonitor(result);
+  return humidity;
 }
 
-void updateTemperature() {
+float updateTemperature() {
   dht.readTemperature();
   if (isnan(dht.temperature_C)) {
     Serial.println("DHT sensor read failure!");
@@ -77,9 +74,10 @@ void updateTemperature() {
   sprintf(result, "%s*C", str_temperature);
 
   printToMonitor(result);
+  return temperature;
 }
 
-void updatePressure() {
+int updatePressure() {
   if (!bme.begin()) {
     Serial.println("BME280 sensor read failure!");
     return;
@@ -92,6 +90,7 @@ void updatePressure() {
   sprintf(result, "%dmm", pressure);
 
   printToMonitor(result);
+  return pressure;
 }
 
 void printToMonitor(String value) {
@@ -102,4 +101,27 @@ void printToMonitor(String value) {
   u8g2.setFont(u8g2_font_logisoso28_tr);
   u8g2.drawStr(8, 31, buffer);
   u8g2.sendBuffer();
+}
+
+void logToFile(float humidity, float temperature, int pressure) {
+
+  long timestamp = RTC.now().unixtime();
+
+  String logString = "";
+  logString += String(timestamp);
+  logString += ",";
+  logString += String(humidity);
+  logString += ",";
+  logString += String(temperature);
+  logString += ",";
+  logString += String(pressure);
+
+  File logFile = SD.open("meteo.txt", FILE_WRITE);
+  if (logFile) {
+    logFile.println(logString);
+    logFile.close();
+    Serial.println(logString); // TODO!
+  } else {
+    Serial.println("error opening file");
+  }
 }
