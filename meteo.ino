@@ -21,6 +21,7 @@ const byte GET_C02_COMMAND[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00,
 
 void setup() {
   Serial.begin(9600);
+  Serial1.begin(115200); // ESP-01 HardWare Serial
   u8g2.begin();
   dht.begin();
   co2Serial.begin(9600);
@@ -45,6 +46,7 @@ void loop() {
   int co2 = updateCO2();
   delay(2000);
   logToFile(humidity, temperature, pressure, co2);
+  sendToEsp(humidity, temperature, pressure, co2);
 }
 
 float updateHumidity() {
@@ -161,4 +163,17 @@ void printToMonitor(String value) {
   u8g2.setFont(u8g2_font_logisoso28_tr);
   u8g2.drawStr(8, 31, buffer);
   u8g2.sendBuffer();
+}
+
+void sendToEsp(float humidity, float temperature, int pressure, int co2) {
+  String dataString = "humidity value=";
+  dataString += String(humidity);
+  dataString += "\ntemperature value=";
+  dataString += String(temperature);
+  dataString += "\npressure value=";
+  dataString += String(pressure);
+  dataString += "\nco2 value=";
+  dataString += String(co2);
+  dataString += ";";
+  Serial1.print(dataString);
 }
