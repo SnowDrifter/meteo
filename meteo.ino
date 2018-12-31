@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Adafruit_BMP280.h>
 #include <math.h>
-#include <U8g2lib.h>
+#include "Ucglib.h"
 #include <SPI.h>
 #include <Wire.h>
 #include <cactus_io_AM2302.h>
@@ -12,17 +12,21 @@
 #define AM2302_PIN 2
 #define SD_PORT 53
 
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0);
+Ucglib_ST7735_18x128x160_SWSPI ucg(/*sclk=*/ 7, /*data=*/ 6, /*cd=*/ 5, /*cs=*/ 3, /*reset=*/ 4);
 AM2302 dht(AM2302_PIN);
 Adafruit_BMP280 bme;
 RTClib RTC;
 SoftwareSerial co2Serial(10, 11);
 const byte GET_C02_COMMAND[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
 
+float humidity;
+float temperature;
+int pressure;
+int co2;
+
 void setup() {
   Serial.begin(9600);
   Serial1.begin(115200); // ESP-01 HardWare Serial
-  u8g2.begin();
   dht.begin();
   co2Serial.begin(9600);
 
@@ -33,75 +37,56 @@ void setup() {
     Serial.println("Card initialized");
   }
 
+  ucg.begin(UCG_FONT_MODE_SOLID);
+  ucg.clearScreen();
+  ucg.setRotate90();
+  ucg.setFont(ucg_font_inr24_mr);
+  ucg.setColor(1, 0, 0, 0);  // background (1,R,G,B)
+
   Serial.println("Setup finished");
 }
 
 void loop() {
-  float humidity = updateHumidity();
-  delay(2000);
-  float temperature = updateTemperature();
-  delay(2000);
-  int pressure = updatePressure();
-  delay(2000);
-  int co2 = updateCO2();
-  delay(2000);
-  logToFile(humidity, temperature, pressure, co2);
-  sendToEsp(humidity, temperature, pressure, co2);
+  updateHumidity();
+  updateTemperature();
+  updatePressure();
+  updateCO2();
+  logToFile();
+  sendToEsp();
+  updateDisplay();
+  delay(8000);
 }
 
-float updateHumidity() {
+void updateHumidity() {
   dht.readHumidity();
   if (isnan(dht.humidity)) {
     Serial.println("DHT sensor read failure!");
     return;
   }
 
-  float humidity = dht.humidity;
-
-  char result[8];
-  char str_humidity[6];
-  dtostrf(humidity, 3, 1, str_humidity);
-  sprintf(result, "%s%%", str_humidity);
-
-  printToMonitor(result);
-  return humidity;
+  humidity = dht.humidity;
 }
 
-float updateTemperature() {
+void updateTemperature() {
   dht.readTemperature();
   if (isnan(dht.temperature_C)) {
     Serial.println("DHT sensor read failure!");
     return;
   }
 
-  float temperature = dht.temperature_C;
-
-  char result[8];
-  char str_temperature[5];
-  dtostrf(temperature, 3, 1, str_temperature);
-  sprintf(result, "%s*C", str_temperature);
-
-  printToMonitor(result);
-  return temperature;
+  temperature = dht.temperature_C;
 }
 
-int updatePressure() {
+void updatePressure() {
   if (!bme.begin()) {
     Serial.println("BME280 sensor read failure!");
     return;
   }
 
-  int pressure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
-
-  char result[8];
-  char str_pressure[6];
-  sprintf(result, "%dmm", pressure);
-
-  printToMonitor(result);
-  return pressure;
+  pressure = bme.readPressure() / 133.3; // Convert from Pa to mmHg
 }
 
-int updateCO2() {
+void updateCO2() {
   co2Serial.write(GET_C02_COMMAND, 9);
   unsigned char response[9];
   memset(response, 0, 9);
@@ -116,22 +101,14 @@ int updateCO2() {
 
   if ( !(response[0] == 0xFF && response[1] == 0x86 && response[8] == crc) ) {
     Serial.println("MH-Z19B CRC error: " + String(crc) + " / " + String(response[8]));
-    return -1;
   } else {
     unsigned int responseHigh = (unsigned int) response[2];
     unsigned int responseLow = (unsigned int) response[3];
-    int co2 = (256 * responseHigh) + responseLow;
-
-    char result[8];
-    sprintf(result, "%d CO2", co2);
-
-    printToMonitor(result);
-    return co2;
+    co2 = (256 * responseHigh) + responseLow;
   }
 }
 
-void logToFile(float humidity, float temperature, int pressure, int co2) {
-
+void logToFile() {
   long timestamp = RTC.now().unixtime();
 
   String logString = "";
@@ -155,17 +132,7 @@ void logToFile(float humidity, float temperature, int pressure, int co2) {
   }
 }
 
-void printToMonitor(String value) {
-  char buffer[20];
-  value.toCharArray(buffer, 20);
-
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_logisoso28_tr);
-  u8g2.drawStr(8, 31, buffer);
-  u8g2.sendBuffer();
-}
-
-void sendToEsp(float humidity, float temperature, int pressure, int co2) {
+void sendToEsp() {
   String dataString = "humidity value=";
   dataString += String(humidity);
   dataString += "\ntemperature value=";
@@ -176,4 +143,39 @@ void sendToEsp(float humidity, float temperature, int pressure, int co2) {
   dataString += String(co2);
   dataString += ";";
   Serial1.print(dataString);
+}
+
+void updateDisplay() {
+  char humidity_result[8];
+  char str_humidity[6];
+  dtostrf(humidity, 3, 1, str_humidity);
+  sprintf(humidity_result, "%s%%", str_humidity);
+
+  ucg.setColor(0, 0, 102, 255);
+  ucg.setPrintPos(0, 32);
+  ucg.print(humidity_result);
+
+  char temperature_result[8];
+  char str_temperature[5];
+  dtostrf(temperature, 3, 1, str_temperature);
+  sprintf(temperature_result, "%sC", str_temperature);
+
+  ucg.setColor(0, 51, 204, 51);
+  ucg.setPrintPos(0, 64);
+  ucg.print(temperature_result);
+
+  char pressure_result[8];
+  char str_pressure[6];
+  sprintf(pressure_result, "%dmm", pressure);
+
+  ucg.setColor(0, 255, 204, 0);
+  ucg.setPrintPos(0, 96);
+  ucg.print(pressure_result);
+
+  char co2_result[8];
+  sprintf(co2_result, "%d CO2", co2);
+
+  ucg.setColor(0, 255, 51, 0);
+  ucg.setPrintPos(0, 128);
+  ucg.print(co2_result);
 }
