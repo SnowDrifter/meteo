@@ -18,10 +18,12 @@ Adafruit_BMP280 bme;
 RTClib RTC;
 SoftwareSerial co2Serial(10, 11);
 const byte GET_C02_COMMAND[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+const int CO2_PREHEATING_VALUE = 410;
+boolean co2PreheatingFinish = false;
 
 float humidity;
 float temperature;
-int pressure;
+float pressure;
 int co2;
 
 void setup() {
@@ -105,6 +107,9 @@ void updateCO2() {
     unsigned int responseHigh = (unsigned int) response[2];
     unsigned int responseLow = (unsigned int) response[3];
     co2 = (256 * responseHigh) + responseLow;
+    if (!co2PreheatingFinish && co2 != CO2_PREHEATING_VALUE) {
+      co2PreheatingFinish = true;
+    }
   }
 }
 
@@ -137,10 +142,16 @@ void sendToEsp() {
   dataString += String(humidity);
   dataString += "\ntemperature value=";
   dataString += String(temperature);
-  dataString += "\npressure value=";
-  dataString += String(pressure);
-  dataString += "\nco2 value=";
-  dataString += String(co2);
+  if (pressure > 600) {
+    dataString += "\npressure value=";
+    char str_pressure[6];
+    dtostrf(pressure, 4, 1, str_pressure);
+    dataString += str_pressure;
+  }
+  if (co2PreheatingFinish) {
+    dataString += "\nco2 value=";
+    dataString += String(co2);
+  }
   dataString += ";";
   Serial1.print(dataString);
 }
@@ -165,8 +176,7 @@ void updateDisplay() {
   ucg.print(temperature_result);
 
   char pressure_result[8];
-  char str_pressure[6];
-  sprintf(pressure_result, "%dmm", pressure);
+  sprintf(pressure_result, "%dmm", int(pressure));
 
   ucg.setColor(0, 255, 204, 0);
   ucg.setPrintPos(0, 96);
